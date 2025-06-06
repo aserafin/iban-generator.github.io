@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>IBAN Generator</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; }
+    select, button { font-size: 1rem; padding: 6px; }
+    #result { margin-top: 20px; font-size: 1.2rem; color: #2c3e50; }
+    label { padding-right: 10px; }
+  </style>
+</head>
+<body>
+<h2>IBAN Generator</h2>
+<label for="country">Country:</label>
+<select id="country">
+  <option value="FR">France (FR)</option>
+  <option value="DE">Germany (DE)</option>
+  <option value="PL">Poland (PL)</option>
+</select>
+<button onclick="generateIBAN()">Generate IBAN</button>
+<div id="result"></div>
+<script>
+  // BIC codes for demo (real banks, public info)
+  // France: BNP Paribas (BNPAFRPP)
+  // Germany: Deutsche Bank (DEUTDEFF)
+  // Poland: PKO Bank Polski (BPKOPLPW)
+  const bicByCountry = {
+    FR: "BNPAFRPP",     // BNP Paribas (France)
+    DE: "DEUTDEFF",     // Deutsche Bank (Germany)
+    PL: "BPKOPLPW",     // PKO Bank Polski (Poland)
+  };
+
+  // Realistic, valid bank/branch codes for each country
+  // France: 30004 (BNP Paribas), 00550 (Paris agency)
+  // Germany: 37040044 (Commerzbank Köln)
+  // Poland: 10201385 (PKO BP Warsaw)
+  const ibanFormats = {
+    FR: { // BNP Paribas Paris
+      length: 27,
+      bban: () => `3000400550${randomAlnum(11)}${randomDigits(2)}`
+    },
+    DE: { // Commerzbank Köln
+      length: 22,
+      bban: () => `37040044${randomDigits(10)}`
+    },
+    PL: { // PKO BP Warsaw
+      length: 28,
+      bban: () => `10201385${randomDigits(16)}`
+    }
+  };
+
+  function randomDigits(n) {
+    let s = '';
+    for (let i = 0; i < n; i++) s += Math.floor(Math.random() * 10);
+    return s;
+  }
+  function randomAlnum(n) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let s = '';
+    for (let i = 0; i < n; i++) s += chars.charAt(Math.floor(Math.random() * chars.length));
+    return s;
+  }
+
+  // IBAN checksum calculation (mod 97)
+  function computeIbanChecksum(ibanNoCheck) {
+    // Move country code and '00' to end
+    const rearranged = ibanNoCheck.slice(4) + ibanNoCheck.slice(0, 4);
+    // Replace letters with numbers (A=10, ..., Z=35)
+    let expanded = '';
+    for (let ch of rearranged) {
+      if (ch >= 'A' && ch <= 'Z') {
+        expanded += (ch.charCodeAt(0) - 55).toString();
+      } else {
+        expanded += ch;
+      }
+    }
+    // Compute mod 97
+    let remainder = expanded, block;
+    while (remainder.length > 2) {
+      block = remainder.substring(0, 9);
+      remainder = (parseInt(block, 10) % 97).toString() + remainder.substring(block.length);
+    }
+    const mod = parseInt(remainder, 10) % 97;
+    const checkDigits = (98 - mod).toString().padStart(2, "0");
+    return checkDigits;
+  }
+
+  function generateIBAN() {
+    const country = document.getElementById('country').value;
+    const resultDiv = document.getElementById('result');
+    // Get BIC and format
+    const bic = bicByCountry[country];
+    const format = ibanFormats[country];
+    if (!bic || !format) {
+      resultDiv.innerHTML = "Unsupported country for IBAN.";
+      return;
+    }
+    // Generate BBAN
+    let bban = format.bban();
+    // Compose IBAN without checksum
+    let ibanNoCheck = country + '00' + bban;
+    // Compute checksum
+    const checkDigits = computeIbanChecksum(ibanNoCheck);
+    // Final IBAN
+    const iban = country + checkDigits + bban;
+    // Format IBAN with spaces every 4 chars
+    const formattedIban = iban.replace(/(.{4})/g, '$1 ').trim();
+    resultDiv.innerHTML = `<b>IBAN:</b> <code>${formattedIban}</code><br><b>Bank BIC:</b> ${bic}`;
+  }
+</script>
+</body>
+</html>
